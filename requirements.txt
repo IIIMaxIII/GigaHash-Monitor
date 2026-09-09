@@ -1,0 +1,9 @@
+requests
+selenium
+webdriver-manager
+beautifulsoup4
+flask
+flask-socketio
+eventlet
+sqlite3
+apscheduler
