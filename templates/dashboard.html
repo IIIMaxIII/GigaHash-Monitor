@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GigaHash Monitor v2.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0a0e17;
+            color: #e0e0e0;
+            padding: 12px;
+        }
+        
+        /* ===== ХЕДЕР ===== */
+        .header {
+            background: linear-gradient(135deg, #0d1520, #1a2332);
+            padding: 14px 24px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            border: 1px solid #2a3a4a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: nowrap;
+            gap: 16px;
+            min-height: 70px;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .header-title-group {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #f7971e, #ffd200);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            white-space: nowrap;
+        }
+        
+        .header .version {
+            color: #667788;
+            font-size: 13px;
+            font-weight: 400;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            white-space: nowrap;
+        }
+        
+        .header .address-wrapper {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+        
+        .header .address {
+            color: #8899aa;
+            font-size: 15px;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.5px;
+            padding: 6px 12px;
+            cursor: help;
+            word-break: break-all;
+            display: block;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s;
+            max-height: 60px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+        
+        .header .address::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        .header .address::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .header .address::-webkit-scrollbar-thumb {
+            background: #2a3a4a;
+            border-radius: 2px;
+        }
+        
+        .header .address:hover {
+            color: #aabbcc;
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.06);
+        }
+        
+        .header .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #4ade80;
+            font-size: 15px;
+            flex-shrink: 0;
+            padding-left: 16px;
+            border-left: 1px solid #1e2d3d;
+        }
+        
+        .header .status .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse 2s infinite;
+        }
+        
+        .header .status .update-label {
+            color: #667788;
+            font-size: 13px;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        /* ===== КАРТОЧКИ МЕТРИК ===== */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        
+        .card {
+            background: linear-gradient(145deg, #0d1520, #141e2b);
+            padding: 14px 18px;
+            border-radius: 10px;
+            border: 1px solid #1e2d3d;
+            transition: all 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: #f7971e;
+        }
+        
+        .card .label {
+            color: #8899aa;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .card .value {
+            font-size: 26px;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.2;
+        }
+        
+        .card .value.gold { color: #ffd700; }
+        .card .value.green { color: #4ade80; }
+        .card .value.blue { color: #60a5fa; }
+        .card .value.orange { color: #f7971e; }
+        .card .value.pink { color: #ec4899; }
+        
+        .card .sub {
+            color: #667788;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+        
+        /* ===== ГРАФИКИ ===== */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .chart-container {
+            background: #0d1520;
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid #1e2d3d;
+        }
+        
+        .chart-container h3 {
+            color: #8899aa;
+            font-size: 13px;
+            margin-bottom: 10px;
+            font-weight: 400;
+            text-align: center;
+        }
+        
+        .chart-container h3 .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+        
+        .chart-container h3 .dot.gold { background: #ffd700; }
+        .chart-container h3 .dot.pink { background: #ec4899; }
+        .chart-container h3 .dot.green { background: #4ade80; }
+        .chart-container h3 .dot.orange { background: #f7971e; }
+        .chart-container h3 .dot.blue { background: #60a5fa; }
+        
+        .chart-container h3 .label {
+            font-weight: 500;
+        }
+        
+        .chart-container h3 .unit {
+            color: #667788;
+            font-size: 11px;
+            font-weight: 300;
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 180px;
+        }
+        
+        /* ===== ВОРКЕРЫ И ВЫПЛАТЫ ===== */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .worker-list {
+            background: #0d1520;
+            padding: 14px 18px;
+            border-radius: 10px;
+            border: 1px solid #1e2d3d;
+        }
+        
+        .worker-list h3 {
+            color: #8899aa;
+            font-size: 14px;
+            margin-bottom: 10px;
+            font-weight: 400;
+            text-align: center;
+            border-bottom: 1px solid #1e2d3d;
+            padding-bottom: 8px;
+        }
+        
+        .worker-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 12px;
+            background: #141e2b;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        
+        .worker-item:hover {
+            background: #1a2538;
+        }
+        
+        .worker-item .name {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 100px;
+        }
+        
+        .worker-item .name .status-dot {
+            font-size: 10px;
+        }
+        
+        .worker-item .name .online {
+            color: #4ade80;
+            font-size: 10px;
+        }
+        .worker-item .name .offline {
+            color: #ef4444;
+            font-size: 10px;
+        }
+        
+        .worker-item .stats {
+            display: flex;
+            gap: 16px;
+            color: #8899aa;
+            font-size: 12px;
+        }
+        
+        .worker-item .stats span {
+            color: #e0e0e0;
+        }
+        
+        .worker-item .stats .stat-icon {
+            margin-right: 4px;
+        }
+        
+        .payout-amount { color: #4ade80 !important; }
+        .payout-fee { color: #f7971e !important; }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 1px 10px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        
+        .status-badge.paid {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+        .status-badge.pending {
+            background: rgba(247, 151, 30, 0.2);
+            color: #f7971e;
+        }
+        
+        .last-update {
+            text-align: center;
+            color: #667788;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+        
+        .empty-message {
+            color: #667788;
+            font-size: 13px;
+            text-align: center;
+            padding: 10px 0;
+        }
+        
+        /* ===== АДАПТИВ ===== */
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            .bottom-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                flex-wrap: wrap;
+                min-height: auto;
+                padding: 12px 16px;
+            }
+            .header-left {
+                flex-wrap: wrap;
+                width: 100%;
+            }
+            .header-title-group {
+                flex-wrap: wrap;
+            }
+            .header h1 {
+                font-size: 22px;
+            }
+            .header .version {
+                font-size: 11px;
+            }
+            .header .address {
+                font-size: 13px;
+                max-height: 50px;
+            }
+            .header .status {
+                padding-left: 0;
+                border-left: none;
+                border-top: 1px solid #1e2d3d;
+                padding-top: 10px;
+                width: 100%;
+                justify-content: flex-start;
+            }
+            .grid {
+                grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            }
+        }
+        
+        @media (max-width: 500px) {
+            .grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+            }
+            .card {
+                padding: 10px 12px;
+            }
+            .card .value {
+                font-size: 18px;
+            }
+            .header h1 {
+                font-size: 18px;
+            }
+            .header .version {
+                font-size: 10px;
+                padding: 1px 8px;
+            }
+            .header .address {
+                font-size: 11px;
+                max-height: 40px;
+                padding: 4px 8px;
+            }
+            .chart-wrapper {
+                height: 140px;
+            }
+            .worker-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            .worker-item .stats {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== ХЕДЕР ===== -->
+    <div class="header">
+        <div class="header-left">
+            <div class="header-title-group">
+                <h1>⚡ GigaHash Monitor</h1>
+                <span class="version">v2.0</span>
+            </div>
+            <div class="address-wrapper">
+                <div class="address" title="{{ address }}">{{ address }}</div>
+            </div>
+        </div>
+        <div class="status">
+            <span class="dot"></span>
+            <span id="status-text">Online</span>
+            <span class="update-label" id="last-update-label"></span>
+        </div>
+    </div>
+    
+    <!-- ===== КАРТОЧКИ МЕТРИК ===== -->
+    <div class="grid" id="metrics">
+        <!-- Заполняется через JS -->
+    </div>
+    
+    <!-- ===== ГРАФИКИ ===== -->
+    <div class="charts-grid">
+        <!-- График баланса -->
+        <div class="chart-container">
+            <h3>
+                <span class="dot gold"></span>
+                <span class="label">Баланс</span>
+                <span class="unit">(NOCK)</span>
+                <span style="color:#667788;margin:0 6px;">·</span>
+                <span class="dot pink"></span>
+                <span class="label">Цена</span>
+                <span class="unit">(USDT)</span>
+            </h3>
+            <div class="chart-wrapper"><canvas id="balanceChart"></canvas></div>
+        </div>
+        
+        <!-- График поступлений -->
+        <div class="chart-container">
+            <h3>
+                <span class="dot green"></span>
+                <span class="label">За час</span>
+                <span class="unit">(NOCK)</span>
+                <span style="color:#667788;margin:0 6px;">·</span>
+                <span class="dot orange"></span>
+                <span class="label">За 24ч всего</span>
+                <span class="unit">(NOCK)</span>
+            </h3>
+            <div class="chart-wrapper"><canvas id="hourlyChart"></canvas></div>
+        </div>
+    </div>
+    
+    <!-- График хешрейта (полная ширина) -->
+    <div class="chart-container" style="margin-bottom: 16px;">
+        <h3>
+            <span class="dot blue"></span>
+            <span class="label">Хешрейт</span>
+            <span class="unit">(proof/s)</span>
+            <span style="color:#667788;margin:0 6px;">·</span>
+            <span class="dot orange"></span>
+            <span class="label">Доход</span>
+            <span class="unit">(USDT)</span>
+        </h3>
+        <div class="chart-wrapper" style="height: 160px;"><canvas id="hashrateChart"></canvas></div>
+    </div>
+    
+    <!-- ===== ВОРКЕРЫ И ВЫПЛАТЫ ===== -->
+    <div class="bottom-grid">
+        <div class="worker-list" id="workers">
+            <h3>👷 Воркеры</h3>
+            <div id="workers-list"></div>
+        </div>
+        
+        <div class="worker-list" id="payouts">
+            <h3>💳 Выплаты</h3>
+            <div id="payouts-list"></div>
+        </div>
+    </div>
+    
+    <div class="last-update">
+        Обновлено: <span id="update-time" class="time">--</span>
+    </div>
+
+    <script>
+        const address = "{{ address }}";
+        let socket = io();
+        let balanceChart, hourlyChart, hashrateChart;
+        
+        function initCharts() {
+            // График баланса и цены — со сглаживанием
+            const ctx1 = document.getElementById('balanceChart').getContext('2d');
+            balanceChart = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Баланс',
+                            data: [],
+                            borderColor: '#ffd700',
+                            backgroundColor: 'rgba(255, 215, 0, 0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 1.5,
+                            pointBackgroundColor: '#ffd700',
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'Цена',
+                            data: [],
+                            borderColor: '#ec4899',
+                            backgroundColor: 'rgba(236, 72, 153, 0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 1.5,
+                            pointBackgroundColor: '#ec4899',
+                            yAxisID: 'y2'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: {
+                            grid: { color: '#1e2d3d' },
+                            ticks: { color: '#667788', font: { size: 10 }, maxTicksLimit: 12, autoSkip: true, maxRotation: 0 }
+                        },
+                        y1: {
+                            position: 'left',
+                            grid: { color: '#1e2d3d' },
+                            ticks: { color: '#ffd700', font: { size: 10 } },
+                            beginAtZero: false
+                        },
+                        y2: {
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#ec4899', font: { size: 10 } },
+                            beginAtZero: false
+                        }
+                    },
+                    hover: {
+                        mode: 'dataset',
+                        intersect: false
+                    }
+                }
+            });
+            
+            // График поступлений — ЗА ЧАС без сглаживания, ЗА 24ч со сглаживанием
+            const ctx2 = document.getElementById('hourlyChart').getContext('2d');
+            hourlyChart = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'За час',
+                            data: [],
+                            borderColor: '#4ade80',
+                            backgroundColor: 'rgba(74, 222, 128, 0.08)',
+                            fill: true,
+                            tension: 0,
+                            stepped: true,
+                            pointRadius: 2,
+                            pointBackgroundColor: '#4ade80',
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'За 24ч',
+                            data: [],
+                            borderColor: '#f7971e',
+                            backgroundColor: 'rgba(247, 151, 30, 0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 2,
+                            pointBackgroundColor: '#f7971e',
+                            yAxisID: 'y2'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: {
+                            grid: { color: '#1e2d3d' },
+                            ticks: { color: '#667788', font: { size: 10 }, maxTicksLimit: 12, autoSkip: true, maxRotation: 0 }
+                        },
+                        y1: {
+                            position: 'left',
+                            grid: { color: '#1e2d3d' },
+                            ticks: { color: '#4ade80', font: { size: 10 }, callback: v => v.toFixed(1) },
+                            beginAtZero: true
+                        },
+                        y2: {
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#f7971e', font: { size: 10 }, callback: v => v.toFixed(1) },
+                            beginAtZero: true
+                        }
+                    },
+                    hover: {
+                        mode: 'dataset',
+                        intersect: false
+                    }
+                }
+            });
+            
+            // График хешрейта — со сглаживанием
+            const ctx3 = document.getElementById('hashrateChart').getContext('2d');
+            hashrateChart = new Chart(ctx3, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Хешрейт',
+                            data: [],
+                            borderColor: '#60a5fa',
+                            backgroundColor: 'rgba(96, 165, 250, 0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 1.5,
+                            pointBackgroundColor: '#60a5fa',
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'Доход',
+                            data: [],
+                            borderColor: '#f7971e',
+                            backgroundColor: 'rgba(247, 151, 30, 0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 1.5,
+                            pointBackgroundColor: '#f7971e',
+                            yAxisID: 'y2'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: {
+                            grid: { color: '#1e2d3d' },
+                            ticks: { color: '#667788', font: { size: 10 }, maxTicksLimit: 12, autoSkip: true, maxRotation: 0 }
+                        },
+                        y1: {
+                            position: 'left',
+                            grid: { color: '#1e2d3d' },
+                            ticks: { color: '#60a5fa', font: { size: 10 } },
+                            beginAtZero: false
+                        },
+                        y2: {
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#f7971e', font: { size: 10 } },
+                            beginAtZero: false
+                        }
+                    },
+                    hover: {
+                        mode: 'dataset',
+                        intersect: false
+                    }
+                }
+            });
+        }
+        
+        function updateBalanceScale(data) {
+            if (!data || data.length === 0) return;
+            const b = data.map(d => d.balance || 0), p = data.map(d => d.nock_price || 0);
+            const minB = Math.min(...b), maxB = Math.max(...b), minP = Math.min(...p), maxP = Math.max(...p);
+            const padB = (maxB - minB) * 0.2 || 10, padP = (maxP - minP) * 0.2 || 0.001;
+            balanceChart.options.scales.y1.suggestedMin = Math.max(0, minB - padB);
+            balanceChart.options.scales.y1.suggestedMax = maxB + padB;
+            balanceChart.options.scales.y2.suggestedMin = Math.max(0, minP - padP);
+            balanceChart.options.scales.y2.suggestedMax = maxP + padP;
+            balanceChart.update();
+        }
+        
+        function updateHashrateScale(data) {
+            if (!data || data.length === 0) return;
+            const h = data.map(d => d.zk_hashrate || 0), e = data.map(d => d.estimated_earnings || 0);
+            const minH = Math.min(...h), maxH = Math.max(...h), minE = Math.min(...e), maxE = Math.max(...e);
+            const padH = (maxH - minH) * 0.2 || 1000, padE = (maxE - minE) * 0.2 || 0.5;
+            hashrateChart.options.scales.y1.suggestedMin = Math.max(0, minH - padH);
+            hashrateChart.options.scales.y1.suggestedMax = maxH + padH;
+            hashrateChart.options.scales.y2.suggestedMin = Math.max(0, minE - padE);
+            hashrateChart.options.scales.y2.suggestedMax = maxE + padE;
+            hashrateChart.update();
+        }
+        
+        function updateMetrics(data) {
+            const b = data.balance || 0, p = data.paid || 0, w = data.workers_online || 0;
+            const h = data.zk_hashrate || 0, e = data.estimated_earnings || 0, s = data.share_acceptance || 0, price = data.nock_price || 0;
+            const bUsd = b * price, pUsd = p * price, eNock = price > 0 ? e / price : 0;
+            
+            document.getElementById('metrics').innerHTML = `
+                <div class="card"><div class="label">💰 Баланс</div><div class="value gold">${b.toFixed(2)}</div><div class="sub">$${bUsd.toFixed(2)}</div></div>
+                <div class="card"><div class="label">💳 Выплачено</div><div class="value orange">${p.toFixed(2)}</div><div class="sub">$${pUsd.toFixed(2)}</div></div>
+                <div class="card"><div class="label">💲 Цена</div><div class="value pink">$${price.toFixed(4)}</div></div>
+                <div class="card"><div class="label">👷 Воркеры</div><div class="value green">${w}</div></div>
+                <div class="card"><div class="label">⚡ Хешрейт</div><div class="value blue">${h.toLocaleString()}</div></div>
+                <div class="card"><div class="label">📊 Доход</div><div class="value gold">$${e.toFixed(2)}</div><div class="sub">${eNock.toFixed(1)} NOCK</div></div>
+                <div class="card"><div class="label">📈 Шары</div><div class="value green">${s.toFixed(1)}%</div></div>
+            `;
+            updateWorkers(data);
+            updatePayouts(data);
+            updateTime();
+        }
+        
+        function updateWorkers(data) {
+            const c = document.getElementById('workers-list');
+            if (!data.workers || data.workers.length === 0) {
+                c.innerHTML = '<div class="empty-message">Нет активных воркеров</div>';
+                return;
+            }
+            c.innerHTML = data.workers.map(w => {
+                const isOnline = (w.status || 'ONLINE') === 'ONLINE';
+                const hashrate = w.hashrate ? w.hashrate.replace(/proof\/s/, ' proof/s') : '0';
+                return `
+                    <div class="worker-item">
+                        <div class="name">
+                            <span class="status-dot">${isOnline ? '🟢' : '🔴'}</span>
+                            ${w.name}
+                            <span class="${isOnline ? 'online' : 'offline'}">● ${w.status || 'ONLINE'}</span>
+                        </div>
+                        <div class="stats">
+                            <span><span class="stat-icon">⚡</span>${hashrate}</span>
+                            <span><span class="stat-icon">💰</span>${w.earnings || '0'}</span>
+                            <span><span class="stat-icon">🖥️</span>${w.gpus || '0/0'}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function updatePayouts(data) {
+            const c = document.getElementById('payouts-list');
+            if (!data.payouts || data.payouts.length === 0) {
+                c.innerHTML = '<div class="empty-message">Нет выплат</div>';
+                return;
+            }
+            c.innerHTML = data.payouts.slice(0, 5).map(p => `
+                <div class="worker-item">
+                    <div class="name">
+                        📋 ${p.batch || 'N/A'}
+                        <span class="status-badge ${(p.status || 'Paid').toLowerCase()}">${p.status || 'Paid'}</span>
+                    </div>
+                    <div class="stats">
+                        <span class="payout-amount"><span class="stat-icon">💰</span>${p.amount || '0'}</span>
+                        <span class="payout-fee"><span class="stat-icon">📋</span>${p.fee || '0'}</span>
+                        <span><span class="stat-icon">🕐</span>${p.updated || ''}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('update-time').textContent = now.toLocaleString();
+            document.getElementById('last-update-label').textContent = '🔄 ' + now.toLocaleTimeString();
+        }
+        
+        function loadHistory() {
+            fetch('/api/history/24').then(r => r.json()).then(res => {
+                if (res.status === 'success' && res.data.length) {
+                    const labels = res.data.map(d => new Date(d.timestamp).toLocaleTimeString('ru', {hour:'2-digit',minute:'2-digit'}));
+                    balanceChart.data.labels = labels;
+                    balanceChart.data.datasets[0].data = res.data.map(d => d.balance || 0);
+                    balanceChart.data.datasets[1].data = res.data.map(d => d.nock_price || 0);
+                    updateBalanceScale(res.data);
+                    hashrateChart.data.labels = labels;
+                    hashrateChart.data.datasets[0].data = res.data.map(d => d.zk_hashrate || 0);
+                    hashrateChart.data.datasets[1].data = res.data.map(d => d.estimated_earnings || 0);
+                    updateHashrateScale(res.data);
+                }
+            }).catch(() => {});
+            
+            fetch('/api/hourly/24').then(r => r.json()).then(res => {
+                if (res.status === 'success' && res.data.length) {
+                    const labels = res.data.map(d => new Date(d.hour).toLocaleTimeString('ru', {hour:'2-digit',minute:'2-digit'}));
+                    const changes = res.data.map(d => d.balance_change || 0);
+                    let cum = 0;
+                    const cumData = changes.map(v => { cum += v; return cum; });
+                    hourlyChart.data.labels = labels;
+                    hourlyChart.data.datasets[0].data = changes;
+                    hourlyChart.data.datasets[1].data = cumData;
+                    hourlyChart.update();
+                }
+            }).catch(() => {});
+        }
+        
+        function loadLatest() {
+            fetch('/api/latest').then(r => r.json()).then(res => {
+                if (res.status === 'success') updateMetrics(res.data);
+            }).catch(() => {});
+        }
+        
+        socket.on('connect', () => {
+            document.getElementById('status-text').textContent = 'Online';
+            document.getElementById('status-text').style.color = '#4ade80';
+        });
+        socket.on('disconnect', () => {
+            document.getElementById('status-text').textContent = 'Offline';
+            document.getElementById('status-text').style.color = '#ef4444';
+        });
+        socket.on('update', data => { updateMetrics(data); loadHistory(); });
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            loadLatest();
+            loadHistory();
+            setInterval(loadLatest, 30000);
+            setInterval(loadHistory, 60000);
+        });
+    </script>
+</body>
+</html>
